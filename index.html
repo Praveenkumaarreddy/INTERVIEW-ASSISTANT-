@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AI English Lecturer Interviewer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; text-align: center; background: #0f172a; color: white; padding: 20px; }
+    video { width: 420px; border-radius: 12px; border: 2px solid #38bdf8; margin-top: 10px; }
+    #controls { margin-top: 15px; }
+    button { padding: 12px 24px; font-size: 16px; border-radius: 8px; border: none; background: #38bdf8; color: #0f172a; font-weight: bold; cursor: pointer; }
+    #transcript { margin-top: 20px; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.5; color: #94a3b8; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>AI Interviewer for English Lecturers 📚</h1>
+  <p>Practice your lecture delivery, pedagogy, and communication skills.</p>
+  
+  <video id="webcam" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+
+  <div id="controls">
+    <button id="micBtn">🎙️ Start Answer</button>
+  </div>
+
+  <div id="transcript">Click "Start Answer" when you are ready to speak...</div>
+
+  <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const micBtn = document.getElementById('micBtn');
+    const transcript = document.getElementById('transcript');
+
+    // Replace this string with your live Render backend URL after deploying Step 2
+    const BACKEND_URL = 'RENDER_URL_HERE';
+
+    navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      .then(stream => video.srcObject = stream)
+      .catch(err => alert("Camera permission required!"));
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+
+    micBtn.onclick = () => {
+      recognition.start();
+      transcript.innerText = "Listening...";
+      micBtn.style.background = "#ef4444";
+    };
+
+    recognition.onresult = async (event) => {
+      micBtn.style.background = "#38bdf8";
+      const userText = event.results[0][0].transcript;
+      transcript.innerText = `You said: "${userText}"\nAnalyzing speech & camera frame...`;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      const imageB64 = canvas.toDataURL('image/jpeg', 0.6);
+
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/interview-step`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_speech: userText, image_b64: imageB64 })
+        });
+        const data = await res.json();
+        
+        transcript.innerText = `Interviewer: ${data.reply}`;
+        
+        const utterance = new SpeechSynthesisUtterance(data.reply);
+        window.speechSynthesis.speak(utterance);
+      } catch (err) {
+        transcript.innerText = "Error connecting to backend server.";
+      }
+    };
+  </script>
+</body>
+</html>
